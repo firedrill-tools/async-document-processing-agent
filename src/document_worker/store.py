@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import time
 import uuid
@@ -37,6 +38,16 @@ class JobStore:
                     updated_at REAL NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS jobs_status_created ON jobs(status, created_at);
+                CREATE TABLE IF NOT EXISTS job_attempts (
+                    job_id TEXT NOT NULL,
+                    attempt INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    result_json TEXT,
+                    error TEXT,
+                    started_at REAL NOT NULL,
+                    finished_at REAL,
+                    PRIMARY KEY (job_id, attempt)
+                );
             """)
 
     @contextmanager
@@ -77,8 +88,14 @@ class JobStore:
     def get(self, job_id: str, db: sqlite3.Connection | None = None) -> dict | None:
         if db is not None:
             row = db.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
-            return dict(row) if row else None
+            if row is None:
+                return None
+            result = dict(row)
+            result["attempts"] = [dict(item) for item in db.execute(
+                "SELECT * FROM job_attempts WHERE job_id=? ORDER BY attempt", (job_id,))]
+            return result
         with self._connect() as owned:
+            owned.execute("BEGIN")
             return self.get(job_id, owned)
 
     def list_jobs(self) -> list[dict]:
@@ -109,7 +126,7 @@ class JobStore:
                 raise ValueError("only failed jobs can be retried")
             if row["attempt"] >= MAX_ATTEMPTS:
                 raise ValueError("retry limit reached")
-            db.execute("""UPDATE jobs SET status='queued', error=NULL, lease_token=NULL,
+            db.execute("""UPDATE jobs SET status='queued', error=NULL, result_json=NULL, lease_token=NULL,
                 lease_until=NULL, cancel_requested=0, updated_at=? WHERE job_id=?""", (now, job_id))
             return self.get(job_id, db)
 
@@ -119,6 +136,13 @@ class JobStore:
         now = self.clock()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            db.execute("""UPDATE job_attempts SET
+                status=CASE WHEN EXISTS (SELECT 1 FROM jobs j WHERE j.job_id=job_attempts.job_id AND j.cancel_requested=1)
+                            THEN 'cancelled' ELSE 'lease_expired' END,
+                error='lease expired; provider outcome unknown', finished_at=?
+                WHERE status='running' AND EXISTS (
+                    SELECT 1 FROM jobs j WHERE j.job_id=job_attempts.job_id AND j.attempt=job_attempts.attempt
+                    AND j.status='running' AND j.lease_until<=?)""", (now, now))
             db.execute("""UPDATE jobs SET status='cancelled', lease_token=NULL, lease_until=NULL, updated_at=?
                 WHERE status='running' AND lease_until<=? AND cancel_requested=1""", (now, now))
             db.execute("""UPDATE jobs SET status='failed', lease_token=NULL, lease_until=NULL,
@@ -134,6 +158,8 @@ class JobStore:
             db.execute("""UPDATE jobs SET status='running', attempt=attempt+1,
                 lease_token=?, lease_until=?, updated_at=? WHERE job_id=?""",
                 (token, now + lease_seconds, now, row["job_id"]))
+            db.execute("""INSERT INTO job_attempts (job_id, attempt, status, started_at)
+                SELECT job_id, attempt, 'running', ? FROM jobs WHERE job_id=?""", (now, row["job_id"]))
             return self.get(row["job_id"], db)
 
     def finish(self, job_id: str, lease_token: str, result_json: str | None = None,
@@ -146,8 +172,14 @@ class JobStore:
             row = self.get(job_id, db)
             if row is None or row["status"] != "running" or row["lease_token"] != lease_token:
                 return False
+            attempt_result = result_json
             if row["cancel_requested"]:
+                observed = json.loads(result_json).get("model_observation") if result_json else None
+                attempt_result = json.dumps({"job_id": job_id, "document_id": row["document_id"],
+                    "attempt": row["attempt"], "model_observation": observed}) if observed is not None else None
                 status, result_json, error = "cancelled", None, None
+            db.execute("""UPDATE job_attempts SET status=?, result_json=?, error=?, finished_at=?
+                WHERE job_id=? AND attempt=?""", (status, attempt_result, error, now, job_id, row["attempt"]))
             db.execute("""UPDATE jobs SET status=?, result_json=?, error=?, lease_token=NULL,
                 lease_until=NULL, updated_at=? WHERE job_id=?""",
                 (status, result_json, error, now, job_id))

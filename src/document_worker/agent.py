@@ -7,6 +7,7 @@ import os
 import uuid
 from contextlib import aclosing
 from typing import Literal
+from dataclasses import dataclass
 
 from google.adk.agents import LlmAgent
 from google.adk.apps import App
@@ -26,6 +27,18 @@ class DocumentFacts(BaseModel):
     concerns: list[str] = Field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class DocumentExtraction:
+    facts: DocumentFacts
+    model_observation: dict
+
+
+class ExtractionError(RuntimeError):
+    def __init__(self, message: str, model_observation: dict):
+        super().__init__(message)
+        self.model_observation = model_observation
+
+
 class ADKExtractor:
     def __init__(self, model: str | BaseLlm | None = None):
         if not isinstance(model, BaseLlm) and not os.environ.get("GOOGLE_API_KEY"):
@@ -33,6 +46,7 @@ class ADKExtractor:
         model_name = model or os.environ.get("GEMINI_MODEL")
         if not model_name:
             raise RuntimeError("GEMINI_MODEL must name an enabled Gemini model")
+        self.model_name = model_name if isinstance(model_name, str) else model_name.model
         agent = LlmAgent(
             name="document_extractor",
             model=model_name,
@@ -48,18 +62,29 @@ class ADKExtractor:
         )
         self.runner = InMemoryRunner(app=App(name="document_processing", root_agent=agent))
 
-    async def __call__(self, document_text: str) -> DocumentFacts:
+    async def __call__(self, document_text: str) -> DocumentExtraction:
         job_session = str(uuid.uuid4())
         await self.runner.session_service.create_session(
             app_name="document_processing", user_id="worker", session_id=job_session
         )
+        usage_events = []
+        response_models = set()
+        observed_events = set()
+        def observation():
+            return {"source": "adk_runner", "requested_model": self.model_name,
+                    "response_models": sorted(response_models) or None,
+                    "usage_events": usage_events or None, "cost_usd": None}
         try:
             message = types.Content(role="user", parts=[types.Part.from_text(text=document_text)])
             async with aclosing(self.runner.run_async(
                 user_id="worker", session_id=job_session, new_message=message
             )) as events:
-                async for _event in events:
-                    pass
+                async for event in events:
+                    if event.model_version:
+                        response_models.add(event.model_version)
+                    if event.usage_metadata is not None and not event.partial and event.id not in observed_events:
+                        usage_events.append(event.usage_metadata.model_dump(mode="json", exclude_none=True))
+                        observed_events.add(event.id)
             session = await self.runner.session_service.get_session(
                 app_name="document_processing", user_id="worker", session_id=job_session
             )
@@ -68,7 +93,9 @@ class ADKExtractor:
             raw = session.state["facts"]
             if isinstance(raw, str):
                 raw = json.loads(raw)
-            return DocumentFacts.model_validate(raw)
+            return DocumentExtraction(DocumentFacts.model_validate(raw), observation())
+        except Exception as error:
+            raise ExtractionError(str(error), observation()) from error
         finally:
             await self.runner.session_service.delete_session(
                 app_name="document_processing", user_id="worker", session_id=job_session

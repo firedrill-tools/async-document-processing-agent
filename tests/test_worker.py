@@ -2,13 +2,16 @@ import asyncio
 import json
 import hashlib
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from document_worker.agent import ADKExtractor, DocumentFacts
+from document_worker.agent import ADKExtractor, DocumentFacts, DocumentExtraction, ExtractionError
+from document_worker.__main__ import public_job
 from document_worker.store import JobStore
 from document_worker.worker import DocumentWorker
 
@@ -24,6 +27,8 @@ class FakeDocumentModel(BaseLlm):
     model: str = "fixture-model"
     fail: bool = False
     delay_seconds: float = 0
+    report_usage: bool = False
+    reported_model: str | None = None
 
     async def generate_content_async(self, llm_request, stream=False):
         # This exercises the actual ADK runner and structured-output state path.
@@ -36,15 +41,17 @@ class FakeDocumentModel(BaseLlm):
             document_number="INV-1048", currency="USD", total_cents=5000,
             due_date="2026-11-09",
         )
-        yield LlmResponse(content=types.Content(
+        yield LlmResponse(model_version=self.reported_model,
+            usage_metadata=types.GenerateContentResponseUsageMetadata(prompt_token_count=25, candidates_token_count=10, total_token_count=35) if self.report_usage else None,
+            content=types.Content(
             role="model", parts=[types.Part.from_text(text=result.model_dump_json())]
         ))
 
 
 def test_adk_runner_structured_output_without_network():
     result = asyncio.run(ADKExtractor(model=FakeDocumentModel())("synthetic invoice text"))
-    assert result.document_number == "INV-1048"
-    assert result.total_cents == 5000
+    assert result.facts.document_number == "INV-1048"
+    assert result.facts.total_cents == 5000
 
 
 def test_submission_is_idempotent_and_conflict_detected(tmp_path):
@@ -268,3 +275,112 @@ def test_busy_fixture_profile_preserves_source_and_result_correlations(tmp_path)
         assert result["job_id"] == job["job_id"]
         assert result["document_id"] == job["document_id"]
         assert result["facts"] == facts[job["document_id"]].model_dump()
+
+
+@pytest.mark.parametrize("report_usage", [False, True])
+def test_adk_model_and_reported_usage_are_persisted_with_the_exact_job(tmp_path, report_usage):
+    store = JobStore(tmp_path / "jobs.db")
+    job = store.submit("usage", "invoice-a", "synthetic invoice")
+    async def scenario():
+        extractor = ADKExtractor(model=FakeDocumentModel(report_usage=report_usage, reported_model="scripted-model-v1"))
+        try:
+            return await DocumentWorker(store, extractor).run_once()
+        finally:
+            await extractor.close()
+    final = asyncio.run(scenario())
+    assert final["status"] == "completed"
+    result = json.loads(final["result_json"])
+    assert result["job_id"] == job["job_id"] and result["document_id"] == "invoice-a"
+    assert result["model_observation"] == {"source": "adk_runner", "requested_model": "fixture-model",
+        "response_models": ["scripted-model-v1"], "cost_usd": None,
+        "usage_events": [{"prompt_token_count": 25, "candidates_token_count": 10, "total_token_count": 35}] if report_usage else None}
+
+
+def test_reported_usage_survives_an_extraction_failure_without_a_completed_result(tmp_path):
+    store = JobStore(tmp_path / "jobs.db")
+    job = store.submit("observed-failure", "invoice-a", "synthetic invoice")
+    observation = {"source": "adk_runner", "requested_model": "scripted-model", "response_models": None,
+                   "usage_events": [{"total_token_count": 35}], "cost_usd": None}
+    async def processor(_text):
+        raise ExtractionError("synthetic structured output failure", observation)
+    final = asyncio.run(DocumentWorker(store, processor).run_once())
+    assert final["status"] == "failed"
+    assert final["error"] == "synthetic structured output failure"
+    result = json.loads(final["result_json"])
+    assert result == {"job_id": job["job_id"], "document_id": "invoice-a", "attempt": 1, "model_observation": observation}
+
+
+def test_retry_retains_failed_usage_without_exposing_it_as_the_new_result(tmp_path):
+    store = JobStore(tmp_path / "jobs.db")
+    job = store.submit("attempt-history", "invoice-a", "synthetic invoice")
+    observation = {"source": "adk_runner", "requested_model": "scripted-model", "response_models": None,
+                   "usage_events": [{"total_token_count": 35}], "cost_usd": None}
+    async def failed(_text):
+        raise ExtractionError("synthetic failure", observation)
+    asyncio.run(DocumentWorker(store, failed).run_once())
+    queued = store.retry(job["job_id"])
+    assert queued["result_json"] is None
+    assert queued["attempts"][0]["status"] == "failed"
+    assert json.loads(queued["attempts"][0]["result_json"])["model_observation"] == observation
+    async def recovered(_text):
+        return DocumentFacts(document_type="invoice", issuer="Synthetic Vendor", currency="USD", total_cents=5000)
+    final = asyncio.run(DocumentWorker(store, recovered).run_once())
+    assert final["status"] == "completed" and final["attempt"] == 2
+    assert [attempt["status"] for attempt in final["attempts"]] == ["failed", "completed"]
+    shown = public_job(final)
+    assert "lease_token" not in shown and "document_text" not in shown
+    assert shown["result"]["attempt"] == 2
+    assert shown["attempts"][0]["result"]["attempt"] == 1
+    assert shown["attempts"][0]["result"]["model_observation"] == observation
+
+
+def test_cancelled_result_discards_facts_but_retains_reported_usage_in_attempt_history(tmp_path):
+    store = JobStore(tmp_path / "jobs.db")
+    job = store.submit("cancel-with-usage", "invoice-a", "synthetic invoice")
+    observation = {"source": "adk_runner", "requested_model": "scripted-model", "response_models": None,
+                   "usage_events": [{"total_token_count": 35}], "cost_usd": None}
+    async def processor(_text):
+        store.cancel(job["job_id"])
+        return DocumentExtraction(DocumentFacts(document_type="invoice", issuer="Synthetic Vendor", currency="USD", total_cents=5000), observation)
+    final = asyncio.run(DocumentWorker(store, processor).run_once())
+    assert final["status"] == "cancelled" and final["result_json"] is None
+    attempt = final["attempts"][0]
+    assert attempt["status"] == "cancelled"
+    assert json.loads(attempt["result_json"]) == {"job_id": job["job_id"], "document_id": "invoice-a", "attempt": 1, "model_observation": observation}
+
+
+def test_simultaneous_workers_claim_one_job_and_create_one_attempt(tmp_path):
+    path = tmp_path / "jobs.db"; store = JobStore(path)
+    job = store.submit("race", "invoice-a", "synthetic invoice")
+    workers = [JobStore(path), JobStore(path)]; barrier = Barrier(2)
+    def claim(worker):
+        barrier.wait(timeout=2)
+        return worker.claim()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(claim, workers))
+    claimed = [result for result in results if result is not None]
+    assert len(claimed) == 1 and claimed[0]["job_id"] == job["job_id"]
+    assert claimed[0]["attempt"] == 1
+    assert len(store.get(job["job_id"])["attempts"]) == 1
+
+
+def test_late_worker_receipt_cannot_claim_a_replacements_completion(tmp_path):
+    clock = Clock(); store = JobStore(tmp_path / "jobs.db", clock=clock)
+    job = store.submit("late-worker", "invoice-a", "synthetic invoice")
+    async def scenario():
+        started = asyncio.Event(); release = asyncio.Event()
+        async def slow(_text):
+            started.set(); await release.wait()
+            return DocumentFacts(document_type="invoice", issuer="Old worker", currency="USD", total_cents=5000)
+        task = asyncio.create_task(DocumentWorker(store, slow).run_once(lease_seconds=10))
+        await started.wait(); clock.now += 11
+        replacement = store.claim(lease_seconds=10)
+        payload = json.dumps({"job_id": job["job_id"], "document_id": "invoice-a", "attempt": 2, "facts": {"issuer": "Replacement"}})
+        assert store.finish(job["job_id"], replacement["lease_token"], payload)
+        release.set()
+        return await task
+    receipt = asyncio.run(scenario())
+    assert receipt["status"] == "completed" and receipt["attempt"] == 2
+    assert receipt["worker_attempt"] == 1 and receipt["commit_accepted"] is False
+    assert json.loads(receipt["result_json"])["facts"]["issuer"] == "Replacement"
+    assert [attempt["status"] for attempt in receipt["attempts"]] == ["lease_expired", "completed"]

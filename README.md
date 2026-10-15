@@ -21,23 +21,30 @@ uv run python -m document_worker --db jobs.db work --once
 uv run python -m document_worker --db jobs.db work
 ```
 
-`get JOB_ID`, `cancel JOB_ID`, and `retry JOB_ID` use the same `--db` option. `work` polls continuously; `--once` claims at most one job. The CLI omits the document body and lease token from its output. `fixtures/manifest.json` identifies dataset `synthetic-document-jobs` version `1`, with starter, busy, ambiguous and boundary profiles. Its five fictional text documents include complete invoices, a receipt, unreadable fields and a contradictory correction. See [scenario briefs](scenarios/README.md) for exact inputs, completion signals and reset ownership.
+`get JOB_ID`, `cancel JOB_ID`, and `retry JOB_ID` use the same `--db` option. `work` polls continuously; `--once` claims at most one job. The CLI omits the source-text and lease-token fields. `get` includes attempt history; `list` is a job summary. `fixtures/manifest.json` identifies dataset `synthetic-document-jobs` version `1`, with starter, busy, ambiguous and boundary profiles. Its five fictional text documents include complete invoices, a receipt, unreadable fields and a contradictory correction. See [scenario briefs](scenarios/README.md) for exact inputs, completion signals and reset ownership.
 
 ## Job behavior
 
 - A repeated idempotency key with the same document returns the original job. Reusing it for different content is rejected.
 - Only one worker can claim a queued job. A lease token fences an older worker if its lease expires and another worker reclaims the job.
-- A queued cancellation stops the job immediately. A running cancellation marks it for cancellation; any late model result is discarded at commit time. The provider call may still finish, so cancellation is cooperative.
+- A queued cancellation stops the job immediately. A running cancellation marks it for cancellation; late extraction facts are discarded at commit time, while reported usage can remain in that attempt's history. The provider call may still finish, so cancellation is cooperative.
 - If a worker is interrupted, its lease expires and a later worker retries that same job. An old worker cannot commit after a new lease is issued. Lease durations must be positive integers.
 - Model or validation failure marks the job failed. `retry` requeues it with the same ID. Explicit retries and expired-lease recovery share a maximum of three worker claims; a job that exhausts that budget stops as failed. The `attempt` field counts claims, which may be interrupted before a model completes; it is not a count of successful provider executions.
 - Missing issuer, currency or total, an unknown document type, or any model-reported concern produces `needs_review`; the worker does not silently mark contradictory facts complete.
 - Each extraction deletes its ephemeral ADK session on success, failure or asyncio cancellation. The CLI closes its runner when its worker invocation exits normally or is cancelled. Abrupt process termination leaves journal recovery to lease expiry.
+- A worker receipt includes `worker_attempt` and `commit_accepted`. A superseded worker can observe the replacement's current job status, but its rejected commit is explicitly false. Inspect the correlated job ID and current terminal state rather than treating a returned request as proof that this worker committed a result.
+
+## Model observations and attempts
+
+Each extraction records the requested model, returned model versions when ADK supplies them, and unmodified usage metadata from distinct nonpartial ADK response events. Missing usage or returned model data is null; cost stays null. `usage_events` are SDK observations, not a count of fresh agent executions or an inferred price. A processor that supplies facts without metadata is labelled `processor_without_metadata`.
+
+`get JOB_ID` retains each claim's status, result/error and timestamps in `attempts`. Explicit retry clears the current result and preserves prior attempt evidence, including usage from a failed extraction. A cancellation can retain usage without retaining rejected facts. Lease expiry is labelled `lease_expired` with provider outcome unknown; it does not prove that an external request stopped or cost zero. Existing journals gain the history table automatically, but observations from attempts predating this change cannot be reconstructed and are not backfilled.
 
 The SQLite journal stores source text and result data for this synthetic example. Use a protected database and an explicit retention policy before adapting it for real documents. This example accepts extracted text, not PDF or OCR input.
 
 ## Evidence and integration
 
-`uv run --locked --extra test pytest -q` passes 19 local cases, including the actual ADK runner with a stub model, correlated results from the busy profile, cancellation and fencing, three-attempt recovery exhaustion, invalid leases, ambiguous facts, and session cleanup after success/failure/cancellation. Regression checks reproduced unbounded lease recovery and accumulating ADK sessions before the fixes. These are offline results and do not prove Gemini output quality or a live provider call. Live Gemini processing and exact field accuracy need an account key and measured results. A thin Firedrill connection will be added after the new Firedrill release is qualified; no retired client is used.
+`uv run --locked --extra test pytest -q` passes 26 local cases, including the actual ADK runner with a stub model, correlated busy-profile results, cancellation and fencing, simultaneous claims, late-worker receipts, three-attempt recovery exhaustion, ambiguous facts, session cleanup, reported/unknown usage and preserved retry history. Regression checks reproduced unbounded lease recovery and accumulating ADK sessions before the fixes. These are offline results and do not prove Gemini output quality or a live provider call. Live Gemini processing and exact field accuracy need an account key and measured results. A thin Firedrill connection will be added after the new Firedrill release is qualified; no retired client is used.
 
 Dependencies are pinned in `uv.lock`, including `google-adk==2.12.0`.
 

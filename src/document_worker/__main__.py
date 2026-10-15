@@ -20,6 +20,8 @@ def public_job(job: dict | None) -> dict | None:
         visible["result"] = json.loads(visible.pop("result_json"))
     else:
         visible.pop("result_json", None)
+    if "attempts" in visible:
+        visible["attempts"] = [public_job(attempt) for attempt in visible["attempts"]]
     return visible
 
 
