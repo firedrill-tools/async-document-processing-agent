@@ -1,0 +1,8 @@
+INVOICE INV-2051
+From: Synthetic Cedar Office Supply
+Issued: 2026-10-12
+Currency: CAD
+Line items: notebooks $24.00, delivery $6.00
+Printed total due: $30.00
+Handwritten correction: Total due $45.00, currency USD
+No explanation or signed correction is present.

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "synthetic-document-jobs",
+  "version": 1,
+  "documents": {
+    "invoice-a": "invoice-a.txt",
+    "receipt-b": "receipt-b.txt",
+    "unreadable-c": "unreadable-c.txt",
+    "invoice-d": "invoice-d.txt",
+    "ambiguous-e": "ambiguous-e.txt"
+  },
+  "profiles": {
+    "starter": ["invoice-a"],
+    "busy": ["invoice-a", "receipt-b", "invoice-d"],
+    "ambiguous": ["ambiguous-e"],
+    "boundary": ["unreadable-c"]
+  }
+}

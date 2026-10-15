@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from contextlib import aclosing
+from typing import Literal
 
 from google.adk.agents import LlmAgent
 from google.adk.apps import App
@@ -15,7 +17,7 @@ from pydantic import BaseModel, Field
 
 
 class DocumentFacts(BaseModel):
-    document_type: str = Field(description="invoice, receipt, or unknown")
+    document_type: Literal["invoice", "receipt", "unknown"]
     issuer: str | None = None
     document_number: str | None = None
     currency: str | None = None
@@ -51,17 +53,26 @@ class ADKExtractor:
         await self.runner.session_service.create_session(
             app_name="document_processing", user_id="worker", session_id=job_session
         )
-        message = types.Content(role="user", parts=[types.Part.from_text(text=document_text)])
-        async for _event in self.runner.run_async(
-            user_id="worker", session_id=job_session, new_message=message
-        ):
-            pass
-        session = await self.runner.session_service.get_session(
-            app_name="document_processing", user_id="worker", session_id=job_session
-        )
-        if session is None or "facts" not in session.state:
-            raise RuntimeError("ADK run did not produce structured facts")
-        raw = session.state["facts"]
-        if isinstance(raw, str):
-            raw = json.loads(raw)
-        return DocumentFacts.model_validate(raw)
+        try:
+            message = types.Content(role="user", parts=[types.Part.from_text(text=document_text)])
+            async with aclosing(self.runner.run_async(
+                user_id="worker", session_id=job_session, new_message=message
+            )) as events:
+                async for _event in events:
+                    pass
+            session = await self.runner.session_service.get_session(
+                app_name="document_processing", user_id="worker", session_id=job_session
+            )
+            if session is None or "facts" not in session.state:
+                raise RuntimeError("ADK run did not produce structured facts")
+            raw = session.state["facts"]
+            if isinstance(raw, str):
+                raw = json.loads(raw)
+            return DocumentFacts.model_validate(raw)
+        finally:
+            await self.runner.session_service.delete_session(
+                app_name="document_processing", user_id="worker", session_id=job_session
+            )
+
+    async def close(self) -> None:
+        await self.runner.close()

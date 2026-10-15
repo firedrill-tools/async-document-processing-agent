@@ -50,8 +50,14 @@ def main() -> None:
     elif args.command == "list":
         output = store.list_jobs()
     else:
-        worker = DocumentWorker(store, ADKExtractor(model=args.model))
-        output = asyncio.run(worker.run_once() if args.once else worker.run_forever())
+        async def process_jobs():
+            extractor = ADKExtractor(model=args.model)
+            try:
+                worker = DocumentWorker(store, extractor)
+                return await (worker.run_once() if args.once else worker.run_forever())
+            finally:
+                await extractor.close()
+        output = asyncio.run(process_jobs())
     if isinstance(output, list):
         output = [public_job(job) for job in output]
     elif isinstance(output, dict):

@@ -1,0 +1,7 @@
+INVOICE INV-2050
+From: Synthetic Cedar Office Supply
+Issued: 2026-10-12
+Due: 2026-11-11
+Currency: CAD
+Line items: notebooks $24.00, delivery $6.00
+Total due: $30.00

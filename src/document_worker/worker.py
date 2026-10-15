@@ -27,7 +27,9 @@ class DocumentWorker:
                 self.processor(job["document_text"]), timeout=self.timeout_seconds
             )
             facts = DocumentFacts.model_validate(result)
-            status = "completed" if all((facts.issuer, facts.currency, facts.total_cents is not None)) else "needs_review"
+            complete = (facts.document_type in {"invoice", "receipt"} and not facts.concerns
+                        and all((facts.issuer, facts.currency, facts.total_cents is not None)))
+            status = "completed" if complete else "needs_review"
             payload = json.dumps({
                 "job_id": job["job_id"],
                 "document_id": job["document_id"],

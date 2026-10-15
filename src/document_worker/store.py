@@ -10,6 +10,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
 
+MAX_ATTEMPTS = 3
+
 
 class JobStore:
     def __init__(self, path: str | Path, clock: Callable[[], float] = time.time):
@@ -105,21 +107,27 @@ class JobStore:
                 return None
             if row["status"] != "failed":
                 raise ValueError("only failed jobs can be retried")
-            if row["attempt"] >= 3:
+            if row["attempt"] >= MAX_ATTEMPTS:
                 raise ValueError("retry limit reached")
             db.execute("""UPDATE jobs SET status='queued', error=NULL, lease_token=NULL,
                 lease_until=NULL, cancel_requested=0, updated_at=? WHERE job_id=?""", (now, job_id))
             return self.get(job_id, db)
 
     def claim(self, lease_seconds: int = 300) -> dict | None:
+        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or lease_seconds <= 0:
+            raise ValueError("lease_seconds must be a positive integer")
         now = self.clock()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute("""UPDATE jobs SET status='cancelled', lease_token=NULL, lease_until=NULL, updated_at=?
                 WHERE status='running' AND lease_until<=? AND cancel_requested=1""", (now, now))
+            db.execute("""UPDATE jobs SET status='failed', lease_token=NULL, lease_until=NULL,
+                error='worker attempt limit reached', updated_at=?
+                WHERE cancel_requested=0 AND attempt>=? AND
+                    ((status='running' AND lease_until<=?) OR status='queued')""", (now, MAX_ATTEMPTS, now))
             db.execute("""UPDATE jobs SET status='queued', lease_token=NULL, lease_until=NULL, updated_at=?
-                WHERE status='running' AND lease_until<=? AND cancel_requested=0""", (now, now))
-            row = db.execute("SELECT job_id FROM jobs WHERE status='queued' ORDER BY created_at, job_id LIMIT 1").fetchone()
+                WHERE status='running' AND lease_until<=? AND cancel_requested=0 AND attempt<?""", (now, now, MAX_ATTEMPTS))
+            row = db.execute("SELECT job_id FROM jobs WHERE status='queued' AND attempt<? ORDER BY created_at, job_id LIMIT 1", (MAX_ATTEMPTS,)).fetchone()
             if not row:
                 return None
             token = str(uuid.uuid4())
