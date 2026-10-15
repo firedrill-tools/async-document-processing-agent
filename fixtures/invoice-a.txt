@@ -1,0 +1,7 @@
+INVOICE INV-1048
+From: Northstar Paper Supply
+Issued: 2026-10-10
+Due: 2026-11-09
+Currency: USD
+Line items: paper $42.00, delivery $8.00
+Total due: $50.00
