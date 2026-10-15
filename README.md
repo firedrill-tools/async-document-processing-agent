@@ -39,3 +39,5 @@ The SQLite journal stores source text and result data for this synthetic example
 `uv run pytest -q` includes an ADK runner/structured-output test using a local model stub and durable worker tests. It does not prove Gemini output quality or a live provider call. Live Gemini processing and exact field accuracy need an account key and measured results. A thin Firedrill connection will be added after the new Firedrill release is qualified; no retired client is used.
 
 Dependencies are pinned in `uv.lock`, including `google-adk==2.12.0`.
+
+Explore related applications in the [Firedrill example catalog](https://github.com/firedrill-tools/firedrill-example-catalog). Product and setup references: [Firedrill](https://firedrill.run/) and the [official developer documentation](https://docs.firedrill.run/). Use documentation matching the qualified release; this repository records its current integration limits above.
