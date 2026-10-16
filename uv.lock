@@ -48,10 +48,12 @@ wheels = [
 
 [[package]]
 name = "async-document-processing-agent"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "google-adk" },
+    { name = "google-genai" },
+    { name = "httpx" },
 ]
 
 [package.optional-dependencies]
@@ -62,6 +64,8 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "google-adk", specifier = "==2.12.0" },
+    { name = "google-genai", specifier = "==2.31.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8,<10" },
 ]
 provides-extras = ["test"]

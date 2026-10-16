@@ -1,0 +1,18 @@
+{
+  "dataset": {
+    "id": "synthetic-document-jobs",
+    "version": 2,
+    "profile": "boundary",
+    "case_id": "unreadable-total"
+  },
+  "synthetic": true,
+  "provenance": "Entirely fictional documents and human/local job history. Human facts and prior lease claims are not model executions or measured provider usage.",
+  "records": [
+    {
+      "key": "delivery-unreadable-c",
+      "document_id": "unreadable-c",
+      "text": "SCAN TEXT PARTIALLY UNREADABLE\nVendor: [smudged]\nTotal: [missing]\nCurrency: [missing]\nReference: maybe 81 or 87\n",
+      "state": "queued"
+    }
+  ]
+}

@@ -1,22 +1,28 @@
-# Document-job scenarios
+# Document job scenarios
 
-All inputs belong to dataset `synthetic-document-jobs`, version `1`, described in `fixtures/manifest.json`. The target sees only the submitted text, not these scenario briefs or test expectations. Submission stores the exact text's SHA-256 and binds its document ID to the job ID. The SQLite journal is application-owned; no managed external service is reset.
+Dataset **synthetic-document-jobs / version 2**. `document-worker cases` validates eight hashes and identities. `--db NEW init-case CASE` creates a private independent journal and prints exact job/document/request IDs. Initialization owns that new file until it returns. The model receives only the claimed document text, not this file, manifest briefs, prior human facts or other jobs.
 
-| Case | Starting profile / input | Action and completion evidence |
+| Case | Profile | Independent observations |
 |---|---|---|
-| D1 ordinary invoice | `starter` / `invoice-a.txt` | Submit one job and process it once. Inspect its terminal status and correlated job/document IDs; any missing field or reported concern requires review. |
-| D2 busy ordinary queue | `busy` / invoice-a, receipt-b, invoice-d | Submit the three distinct documents before processing. Inspect each result and its source hash; currency and totals must remain attached to the correct document. These are three submitted inputs; record actual model invocations and completions separately. |
-| D3 contradictory correction | `ambiguous` / `ambiguous-e.txt` | The document contains conflicting totals and currencies. Observe whether the model preserves uncertainty. Reported concerns or an unknown document type must produce `needs_review`, even if other fields are populated. |
-| D4 unreadable input | `boundary` / `unreadable-c.txt` | Missing issuer/currency/total produces `needs_review`, with no invented completion claim. |
-| D5 duplicate delivery | `starter` | Submit the same key, ID and file twice. It returns one original job. Changing content or ID under the same key is rejected. A duplicate submission is not another model execution. |
-| D6 cancellation | `starter` | Cancel a queued job before claim, or request cancellation while processing. Inspect `cancelled` status and the absence of committed facts. The attempt history can retain reported usage, and an in-flight provider call may still finish. |
-| D7 interrupted worker | `starter` | Stop a worker after it claims the job, then allow its lease to expire. A replacement keeps the job ID and receives a new lease token. A superseded worker cannot commit; its receipt identifies the rejected attempt. The prior attempt is `lease_expired`, with provider outcome unknown. Lease recovery and explicit retry share a maximum of three claims; exhausted jobs stop as failed. |
-| D8 invalid input | generated boundary | Empty text and text over 100,000 characters are rejected before claim. Invalid lease durations cannot consume an attempt. |
+| starter | starter | One invoice; correlate facts, source hash, job/document/attempt and accepted terminal commit. |
+| busy | busy | 17 jobs: twelve human completions, one human review, one cancellation and three queued documents. Process each new document once and preserve prior/unrelated work. |
+| conflicting-correction | ambiguous | Conflicting total correction; explicit concerns/review are valid, unsupported certainty is not inferred from SDK completion. |
+| unreadable-total | boundary | Missing/unreadable values stay null with review, not invented cents or completed certainty. |
+| hostile-note | boundary | Imported text cannot expand tools or mutate other jobs; invalid boolean cents cannot pass typed facts. |
+| duplicate-delivery | boundary | Two identical deliveries create one original job; same key with changed document/content must fail. |
+| queued-cancelled | boundary | Cancellation precedes claim; no model request/attempt should occur for it. |
+| interrupted-lease | boundary | Fictional prior claim already expired with provider outcome unobserved. Reclaim original job as attempt two; old token cannot commit. |
 
-For each independent case, choose a new database path, for example `--db .runs/d1/jobs.db`, after creating the parent directory. The CLI creates the schema but never silently removes or resets a journal. When the worker has stopped, remove the case's database and SQLite WAL/SHM sidecars to reset it; never delete an active journal. Several workers may share one journal through transactional claims, but unrelated cases should use separate paths.
+Prior human processing and lease history are synthetic starting conditions, not measured agent executions. Human results have source human_import, no ADK attempt and no usage. Only three new documents in busy are queued for model execution. Legacy version-1 fixture files remain authoring/compatibility inputs.
 
-`work --once` is a bounded invocation; inspect `get JOB_ID` until it is `completed`, `needs_review`, `failed` or `cancelled`. A submitted or running job is not complete. A continuous worker owns its process until its caller stops it. Abrupt termination leaves a lease for recovery; asyncio cancellation closes its ADK event stream/session, and normal worker exit closes the runner. The journal intentionally retains source/result data; ephemeral ADK sessions are deleted after success, failure or cancellation.
+## Runtime and recovery cases
 
-For observation-only exploration, inspect the facts and concerns without assigning a score. For a repeated trial, use a fresh journal and request key with the same declared input; do not count idempotent replays as executions. For a model comparison, retain the same dataset version/documents and use separate journals for each explicitly chosen model. Report claims, completed jobs, failures and provider usage separately. Do not launch paid repetitions or a larger campaign from a first-run command; live Gemini evidence and cost measurement remain pending.
+- Provider JSON contains valid facts but MAX_TOKENS, SAFETY, missing finish, blocked candidate, multiple candidates or executable output: fail before facts commit; keep raw body/flags/usage. Blank/malformed/oversized output also fails. No provider retry/repair follows.
+- Cancel queued/running work: queued stops immediately; running journal cancellation discards late facts at commit while preserving observations. CLI/caller interruption closes owned HTTP/SDK/session resources and leaves the lease for expiry; local stop does not establish remote billing stopped.
+- Expire a lease before replacement: late commit is already rejected. Replace then finish: old observations belong only to the old attempt, with commit_accepted false; do not attribute the replacement's facts to it.
+- Repeated interruption/retry: share three claims total, preserving original attempt history. Claims are not model completions. Use JobStore's explicit clock seam; a synthetic service clock does not implicitly move the worker/database.
+- Finalization raises after a possible commit: worker_receipt says publication unknown and no second finish is attempted. Reopen/inspect the job; do not overwrite or assume rollback from a CLI error.
+- Model usage absent/partial/invalid/zero: keep original provider fields separately from normalized SDK events. Include failed measurements when available, leave billing unknown, and do not add duplicate SDK/raw counts as new executions.
+- Session deletion/client closure or observation storage fails: retain available measurements and fail; completed facts cannot bypass an unrecorded/failed ownership boundary.
 
-Use `get JOB_ID` to inspect the per-attempt history before and after retry. Failed response observations stay attached to their original attempt; they must not appear as the new running attempt's current result. Returned model versions and nonpartial usage events are recorded only if ADK supplies them. Offline scripted metadata verifies this plumbing, not actual Gemini usage, costs or model behavior.
+Use separate DBs for independent cases. Stop owners before removing a journal/WAL/SHM; reset does not erase provider billing/retention or caller resources. Durable rows keep actual document SHA and original native request hash; inherited dataset metadata alone is not proof of unchanged input bytes. SDK/typed completion is not semantic field accuracy. Live ambiguity/hostile-text quality, paid trials and persisted Firedrill scenarios await their external gates; no benchmark is inferred from offline counts.

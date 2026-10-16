@@ -1,0 +1,18 @@
+{
+  "dataset": {
+    "id": "synthetic-document-jobs",
+    "version": 2,
+    "profile": "starter",
+    "case_id": "starter"
+  },
+  "synthetic": true,
+  "provenance": "Entirely fictional documents and human/local job history. Human facts and prior lease claims are not model executions or measured provider usage.",
+  "records": [
+    {
+      "key": "delivery-invoice-a",
+      "document_id": "invoice-a",
+      "text": "INVOICE INV-1048\nFrom: Northstar Paper Supply\nIssued: 2026-10-10\nDue: 2026-11-09\nCurrency: USD\nLine items: paper $42.00, delivery $8.00\nTotal due: $50.00\n",
+      "state": "queued"
+    }
+  ]
+}

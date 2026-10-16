@@ -1,0 +1,231 @@
+{
+  "dataset": {
+    "id": "synthetic-document-jobs",
+    "version": 2,
+    "profile": "busy",
+    "case_id": "busy"
+  },
+  "synthetic": true,
+  "provenance": "Entirely fictional documents and human/local job history. Human facts and prior lease claims are not model executions or measured provider usage.",
+  "records": [
+    {
+      "key": "human-HUM-001",
+      "document_id": "history-001",
+      "text": "Fictional invoice HUM-001\nIssuer: Atlas Paper\nIssued: 2026-09-11\nCurrency: USD\nTotal: 20.75\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Atlas Paper",
+        "document_number": "HUM-001",
+        "currency": "USD",
+        "total_cents": 2075,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-002",
+      "document_id": "history-002",
+      "text": "Fictional invoice HUM-002\nIssuer: Harbor Hardware\nIssued: 2026-09-12\nCurrency: USD\nTotal: 23.50\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Harbor Hardware",
+        "document_number": "HUM-002",
+        "currency": "USD",
+        "total_cents": 2350,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-003",
+      "document_id": "history-003",
+      "text": "Fictional invoice HUM-003\nIssuer: Cedar Office\nIssued: 2026-09-13\nCurrency: CAD\nTotal: 26.25\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Cedar Office",
+        "document_number": "HUM-003",
+        "currency": "CAD",
+        "total_cents": 2625,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-004",
+      "document_id": "history-004",
+      "text": "Fictional invoice HUM-004\nIssuer: Maple Packaging\nIssued: 2026-09-14\nCurrency: USD\nTotal: 29.00\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Maple Packaging",
+        "document_number": "HUM-004",
+        "currency": "USD",
+        "total_cents": 2900,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-005",
+      "document_id": "history-005",
+      "text": "Fictional invoice HUM-005\nIssuer: Northstar Printing\nIssued: 2026-09-15\nCurrency: USD\nTotal: 31.75\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Northstar Printing",
+        "document_number": "HUM-005",
+        "currency": "USD",
+        "total_cents": 3175,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-006",
+      "document_id": "history-006",
+      "text": "Fictional invoice HUM-006\nIssuer: Spruce Tools\nIssued: 2026-09-16\nCurrency: CAD\nTotal: 34.50\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Spruce Tools",
+        "document_number": "HUM-006",
+        "currency": "CAD",
+        "total_cents": 3450,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-007",
+      "document_id": "history-007",
+      "text": "Fictional invoice HUM-007\nIssuer: Elm Supply\nIssued: 2026-09-17\nCurrency: USD\nTotal: 37.25\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Elm Supply",
+        "document_number": "HUM-007",
+        "currency": "USD",
+        "total_cents": 3725,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-008",
+      "document_id": "history-008",
+      "text": "Fictional invoice HUM-008\nIssuer: Birch Stationery\nIssued: 2026-09-18\nCurrency: USD\nTotal: 40.00\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Birch Stationery",
+        "document_number": "HUM-008",
+        "currency": "USD",
+        "total_cents": 4000,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-009",
+      "document_id": "history-009",
+      "text": "Fictional invoice HUM-009\nIssuer: Pine Repairs\nIssued: 2026-09-19\nCurrency: CAD\nTotal: 42.75\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Pine Repairs",
+        "document_number": "HUM-009",
+        "currency": "CAD",
+        "total_cents": 4275,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-010",
+      "document_id": "history-010",
+      "text": "Fictional invoice HUM-010\nIssuer: Willow Studio\nIssued: 2026-09-20\nCurrency: USD\nTotal: 45.50\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Willow Studio",
+        "document_number": "HUM-010",
+        "currency": "USD",
+        "total_cents": 4550,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-011",
+      "document_id": "history-011",
+      "text": "Fictional invoice HUM-011\nIssuer: Oak Logistics\nIssued: 2026-09-21\nCurrency: USD\nTotal: 48.25\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Oak Logistics",
+        "document_number": "HUM-011",
+        "currency": "USD",
+        "total_cents": 4825,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-HUM-012",
+      "document_id": "history-012",
+      "text": "Fictional invoice HUM-012\nIssuer: Juniper Services\nIssued: 2026-09-22\nCurrency: CAD\nTotal: 51.00\n",
+      "state": "human_completed",
+      "facts": {
+        "document_type": "invoice",
+        "issuer": "Juniper Services",
+        "document_number": "HUM-012",
+        "currency": "CAD",
+        "total_cents": 5100,
+        "due_date": null,
+        "concerns": []
+      }
+    },
+    {
+      "key": "human-review",
+      "document_id": "history-review",
+      "text": "Fictional receipt\nIssuer: Cedar Office\nCurrency: USD\nTotal: unreadable\n",
+      "state": "human_review",
+      "facts": {
+        "document_type": "receipt",
+        "issuer": "Cedar Office",
+        "currency": "USD",
+        "total_cents": null,
+        "concerns": [
+          "Human reviewer could not read the total."
+        ]
+      }
+    },
+    {
+      "key": "cancelled-delivery",
+      "document_id": "invoice-d",
+      "text": "INVOICE INV-2050\nFrom: Synthetic Cedar Office Supply\nIssued: 2026-10-12\nDue: 2026-11-11\nCurrency: CAD\nLine items: notebooks $24.00, delivery $6.00\nTotal due: $30.00\n",
+      "state": "cancelled"
+    },
+    {
+      "key": "delivery-invoice-a",
+      "document_id": "invoice-a",
+      "text": "INVOICE INV-1048\nFrom: Northstar Paper Supply\nIssued: 2026-10-10\nDue: 2026-11-09\nCurrency: USD\nLine items: paper $42.00, delivery $8.00\nTotal due: $50.00\n",
+      "state": "queued"
+    },
+    {
+      "key": "delivery-receipt-b",
+      "document_id": "receipt-b",
+      "text": "RECEIPT R-77\nFrom: Synthetic Corner Shop\nDate: 2026-10-11\nCurrency: CAD\nTotal paid: $18.45\n",
+      "state": "queued"
+    },
+    {
+      "key": "delivery-invoice-d",
+      "document_id": "invoice-d",
+      "text": "INVOICE INV-2050\nFrom: Synthetic Cedar Office Supply\nIssued: 2026-10-12\nDue: 2026-11-11\nCurrency: CAD\nLine items: notebooks $24.00, delivery $6.00\nTotal due: $30.00\n",
+      "state": "queued"
+    }
+  ]
+}

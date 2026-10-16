@@ -1,0 +1,18 @@
+{
+  "dataset": {
+    "id": "synthetic-document-jobs",
+    "version": 2,
+    "profile": "ambiguous",
+    "case_id": "conflicting-correction"
+  },
+  "synthetic": true,
+  "provenance": "Entirely fictional documents and human/local job history. Human facts and prior lease claims are not model executions or measured provider usage.",
+  "records": [
+    {
+      "key": "delivery-ambiguous-e",
+      "document_id": "ambiguous-e",
+      "text": "INVOICE INV-2051\nFrom: Synthetic Cedar Office Supply\nIssued: 2026-10-12\nCurrency: CAD\nLine items: notebooks $24.00, delivery $6.00\nPrinted total due: $30.00\nHandwritten correction: Total due $45.00, currency USD\nNo explanation or signed correction is present.\n",
+      "state": "queued"
+    }
+  ]
+}

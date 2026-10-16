@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import time
 import uuid
@@ -16,7 +17,12 @@ MAX_ATTEMPTS = 3
 
 class JobStore:
     def __init__(self, path: str | Path, clock: Callable[[], float] = time.time):
-        self.path = str(path)
+        if str(path)==':memory:':raise ValueError('a durable journal file is required')
+        file=Path(path).resolve();file.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+        try:
+            descriptor=os.open(file,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(descriptor)
+        except FileExistsError:pass
+        self.path = str(file)
         self.clock = clock
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
@@ -35,7 +41,8 @@ class JobStore:
                     result_json TEXT,
                     error TEXT,
                     created_at REAL NOT NULL,
-                    updated_at REAL NOT NULL
+                    updated_at REAL NOT NULL,
+                    dataset_json TEXT
                 );
                 CREATE INDEX IF NOT EXISTS jobs_status_created ON jobs(status, created_at);
                 CREATE TABLE IF NOT EXISTS job_attempts (
@@ -46,9 +53,17 @@ class JobStore:
                     error TEXT,
                     started_at REAL NOT NULL,
                     finished_at REAL,
+                    lease_token TEXT,
+                    observation_json TEXT,
                     PRIMARY KEY (job_id, attempt)
                 );
             """)
+            db.execute("BEGIN IMMEDIATE")
+            job_columns={row['name'] for row in db.execute('PRAGMA table_info(jobs)')}
+            if 'dataset_json' not in job_columns:db.execute('ALTER TABLE jobs ADD COLUMN dataset_json TEXT')
+            columns={row['name'] for row in db.execute('PRAGMA table_info(job_attempts)')}
+            for column in ('lease_token','observation_json'):
+                if column not in columns:db.execute(f'ALTER TABLE job_attempts ADD COLUMN {column} TEXT')
 
     @contextmanager
     def _connect(self):
@@ -64,9 +79,10 @@ class JobStore:
         finally:
             db.close()
 
-    def submit(self, request_key: str, document_id: str, document_text: str) -> dict:
-        if not request_key.strip() or not document_id.strip() or not document_text.strip():
+    def submit(self, request_key: str, document_id: str, document_text: str, dataset: dict|None=None) -> dict:
+        if not all(isinstance(value,str) and value.strip() for value in (request_key,document_id,document_text)):
             raise ValueError("request_key, document_id and document_text are required")
+        if len(request_key)>200 or len(document_id)>200:raise ValueError('request_key/document_id exceeds 200 characters')
         if len(document_text) > 100_000:
             raise ValueError("document_text exceeds 100000 characters")
         digest = hashlib.sha256(document_text.encode()).hexdigest()
@@ -77,13 +93,25 @@ class JobStore:
             if row:
                 if row["document_id"] != document_id or row["content_sha256"] != digest:
                     raise ValueError("request_key was already used for a different document")
+                if dataset is not None and row['dataset_json']!=json.dumps(dataset,sort_keys=True,allow_nan=False):raise ValueError('request_key belongs to another dataset identity')
                 return dict(row)
             job_id = str(uuid.uuid4())
             db.execute("""INSERT INTO jobs
-                (job_id, request_key, document_id, document_text, content_sha256, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)""",
-                (job_id, request_key, document_id, document_text, digest, now, now))
+                (job_id, request_key, document_id, document_text, content_sha256, status, created_at, updated_at, dataset_json)
+                VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)""",
+                (job_id, request_key, document_id, document_text, digest, now, now, json.dumps(dataset,sort_keys=True,allow_nan=False) if dataset is not None else None))
             return self.get(job_id, db)
+
+    def import_human(self,job_id: str,facts: dict,status: str) -> dict:
+        """Trusted synthetic authoring seam: human-entered facts, zero model claims."""
+        if status not in {'completed','needs_review'}:raise ValueError('invalid human import status')
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE');row=self.get(job_id,db)
+            if row is None or row['status']!='queued' or row['attempt']!=0:raise ValueError('human import requires a fresh unclaimed job')
+            payload=json.dumps({'job_id':job_id,'document_id':row['document_id'],'attempt':0,'facts':facts,
+                'model_observation':{'source':'human_import','requested_model':None,'response_models':None,'usage_events':None,'cost_usd':None}},allow_nan=False)
+            db.execute('UPDATE jobs SET status=?,result_json=?,updated_at=? WHERE job_id=?',(status,payload,self.clock(),job_id))
+            return self.get(job_id,db)
 
     def get(self, job_id: str, db: sqlite3.Connection | None = None) -> dict | None:
         if db is not None:
@@ -139,7 +167,7 @@ class JobStore:
             db.execute("""UPDATE job_attempts SET
                 status=CASE WHEN EXISTS (SELECT 1 FROM jobs j WHERE j.job_id=job_attempts.job_id AND j.cancel_requested=1)
                             THEN 'cancelled' ELSE 'lease_expired' END,
-                error='lease expired; provider outcome unknown', finished_at=?
+                error='lease expired; inspect attempt observations for provider outcome', finished_at=?
                 WHERE status='running' AND EXISTS (
                     SELECT 1 FROM jobs j WHERE j.job_id=job_attempts.job_id AND j.attempt=job_attempts.attempt
                     AND j.status='running' AND j.lease_until<=?)""", (now, now))
@@ -158,9 +186,18 @@ class JobStore:
             db.execute("""UPDATE jobs SET status='running', attempt=attempt+1,
                 lease_token=?, lease_until=?, updated_at=? WHERE job_id=?""",
                 (token, now + lease_seconds, now, row["job_id"]))
-            db.execute("""INSERT INTO job_attempts (job_id, attempt, status, started_at)
-                SELECT job_id, attempt, 'running', ? FROM jobs WHERE job_id=?""", (now, row["job_id"]))
+            db.execute("""INSERT INTO job_attempts (job_id, attempt, status, started_at, lease_token)
+                SELECT job_id, attempt, 'running', ?, lease_token FROM jobs WHERE job_id=?""", (now, row["job_id"]))
             return self.get(row["job_id"], db)
+
+    def observe(self,job_id: str,attempt: int,lease_token: str,observation: dict,error: str|None=None) -> bool:
+        """Persist an owned attempt observation even after its facts are fenced out."""
+        raw=json.dumps(observation,allow_nan=False)
+        with self._connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            changed=db.execute("UPDATE job_attempts SET observation_json=?, error=COALESCE(?,error) WHERE job_id=? AND attempt=? AND lease_token=?",
+                (raw,error,job_id,attempt,lease_token)).rowcount
+            return changed==1
 
     def finish(self, job_id: str, lease_token: str, result_json: str | None = None,
                status: str = "completed", error: str | None = None) -> bool:
@@ -170,7 +207,7 @@ class JobStore:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self.get(job_id, db)
-            if row is None or row["status"] != "running" or row["lease_token"] != lease_token:
+            if row is None or row["status"] != "running" or row["lease_token"] != lease_token or row["lease_until"]<=now:
                 return False
             attempt_result = result_json
             if row["cancel_requested"]:

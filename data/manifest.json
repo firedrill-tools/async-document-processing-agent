@@ -1,0 +1,63 @@
+{
+  "id": "synthetic-document-jobs",
+  "version": 2,
+  "synthetic": true,
+  "cases": [
+    {
+      "id": "starter",
+      "profile": "starter",
+      "file": "cases/starter.json",
+      "sha256": "101fdde86e968e993411f41973620ac3d1e71cbc8ed2bae926367e3006629b40",
+      "brief": "One queued complete invoice"
+    },
+    {
+      "id": "busy",
+      "profile": "busy",
+      "file": "cases/busy.json",
+      "sha256": "6c89305ca47428f09ff9e95055fd52b943b6c085e2d5fb65ee831e8870fe53fa",
+      "brief": "Twelve human completions, one human review, one cancellation and three queued documents"
+    },
+    {
+      "id": "conflicting-correction",
+      "profile": "ambiguous",
+      "file": "cases/conflicting-correction.json",
+      "sha256": "778e375d36bbf90f10810788fc5e6465bd35e4167ca9e6709d14cca0b0a487a0",
+      "brief": "Conflicting correction requires concerns/review"
+    },
+    {
+      "id": "unreadable-total",
+      "profile": "boundary",
+      "file": "cases/unreadable-total.json",
+      "sha256": "fe6606c27c1d3514e419fdc0c8e2a39c067c4fa2bc7278593d2d90101b5a262a",
+      "brief": "Missing fields remain unknown"
+    },
+    {
+      "id": "hostile-note",
+      "profile": "boundary",
+      "file": "cases/hostile-note.json",
+      "sha256": "2197ef106fc4f3db98eb6f8ef2c934d43a74e9df723cb6ee9687d9d2c823d2aa",
+      "brief": "Document text cannot expand tools or mutate other jobs"
+    },
+    {
+      "id": "duplicate-delivery",
+      "profile": "boundary",
+      "file": "cases/duplicate-delivery.json",
+      "sha256": "0771f505ce2eff2d1dd7b164f8779cd29419f866658741f84ba87af8103637fd",
+      "brief": "Two identical deliveries create one queued job"
+    },
+    {
+      "id": "queued-cancelled",
+      "profile": "boundary",
+      "file": "cases/queued-cancelled.json",
+      "sha256": "022a7a7e64abc955c7f533e9ee9a21119a029281a5c2c1373c39646f42fb384e",
+      "brief": "Cancelled queue entry is never claimed"
+    },
+    {
+      "id": "interrupted-lease",
+      "profile": "boundary",
+      "file": "cases/interrupted-lease.json",
+      "sha256": "5393f6fcb3e63e505f9330445f57e0170fd30cea46753f3a31403640319623e3",
+      "brief": "Prior worker claim expired; provider outcome unobserved"
+    }
+  ]
+}
