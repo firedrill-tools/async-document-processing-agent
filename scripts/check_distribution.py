@@ -75,5 +75,8 @@ with TemporaryDirectory(prefix='document-distribution-') as directory:
     with tarfile.open(sdist) as archive:archive.extractall(source_root,filter='data')
     source,=source_root.iterdir();assert (source/'uv.lock').exists()
     run([UV,'sync','--locked','--no-dev','--no-editable','--project',str(source)],temp)
+    assert (source/'firedrill/scenario.json').exists() and not (source/'firedrill/node_modules').exists()
+    run(['npm','ci','--prefix','firedrill','--ignore-scripts','--no-audit','--no-fund'],source)
+    run(['npm','test','--prefix','firedrill'],source)
     source_case=temp/'source-case';source_case.mkdir();exercise(source/'.venv/bin/python',source_case)
 print('Wheel and sdist passed fresh locked installs, console/module CLI, eight private cases, key preflight, real busy worker, cancellation, duplicate delivery and lease recovery outside checkout.')

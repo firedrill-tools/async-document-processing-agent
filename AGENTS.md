@@ -12,4 +12,8 @@
 - `data/manifest.json` binds eight version-2 cases/four profiles. Busy: 17 jobs, twelve prior human completions, one human review, one cancellation, three queued. Human facts are human_import with zero claims/unknown usage. Seeded prior lease is fictional lifecycle history, not a model result. Legacy fixtures remain authoring inputs; regenerate with scripts/build_fixtures.py. Keep scenario/manifest expectations outside target context.
 - Initialization validates hashes/identity and creates a new private DB exclusively. Wait for it to return before starting workers. Independent cases need separate DBs; stop owners before deleting a DB/WAL/SHM. Reset does not erase reports/provider billing/retention or caller resources. Metadata is declarative after edits; inspect actual document/request hashes. CLI must redact source text/content hash/lease tokens in jobs and attempts, while preserving model observations/results.
 - Verification: `uv run --locked --extra test pytest -q`, `uv build`, `uv run --locked python scripts/check_distribution.py`. Wheel/sdist fresh locked installs verify actual CLI/data/worker/recovery outside checkout. CI also checks deterministic generation. Do not add a scripted production mode, guessed/retired Firedrill client or private platform source.
-- Live Gemini quality/budget, official new Firedrill contract, visibility/license remain parked external gates. Keep standalone development progressing independently.
+- Live Gemini quality/budget and visibility/license remain parked external gates. Keep standalone development progressing independently.
+
+## Current Firedrill integration
+
+Released CLI/SDK 2.2.2, current command invocation, remote operator MCP and recovery are documented in [firedrill/README.md](firedrill/README.md). Offline checks exercise actual durable state and native key preflight; authenticated persisted runs and live model quality/cost remain separate gates.

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "2026-10-14",
+  "name": "Document processing \u2014 actual durable foreground worker",
+  "target": {
+    "kind": "command",
+    "argv": [
+      "node",
+      "firedrill/target.mjs"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "starter-work",
+      "name": "Process the original queued invoice",
+      "input": {
+        "caseId": "starter",
+        "action": "work"
+      }
+    },
+    {
+      "id": "conflicting-correction-work",
+      "name": "Conflicting totals require review",
+      "input": {
+        "caseId": "conflicting-correction",
+        "action": "work"
+      }
+    },
+    {
+      "id": "busy-inspect",
+      "name": "Inspect prior human state without inference",
+      "input": {
+        "caseId": "busy",
+        "action": "inspect"
+      }
+    },
+    {
+      "id": "queued-cancelled-inspect",
+      "name": "Inspect cancelled original job without inference",
+      "input": {
+        "caseId": "queued-cancelled",
+        "action": "inspect"
+      }
+    }
+  ],
+  "repetitions": 1,
+  "concurrency": 1,
+  "limits": {
+    "timeoutMs": 240000,
+    "maxRuns": 4,
+    "maxOutputBytes": 4194304
+  }
+}

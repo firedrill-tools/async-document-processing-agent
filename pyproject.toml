@@ -23,7 +23,7 @@ packages = ["src/document_worker"]
 "data" = "document_worker/sample_data"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "data", "fixtures", "tests", "scripts", "scenarios", "README.md", "AGENTS.md", "PLAN.md", "pyproject.toml", "uv.lock"]
+include = ["firedrill", ".github", ".gitignore", "src", "data", "fixtures", "tests", "scripts", "scenarios", "README.md", "AGENTS.md", "PLAN.md", "pyproject.toml", "uv.lock"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

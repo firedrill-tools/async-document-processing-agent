@@ -11,3 +11,6 @@ __pycache__/
 .runs/
 
 dist/
+
+node_modules/
+.runs/
