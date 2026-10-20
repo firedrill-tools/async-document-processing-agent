@@ -4,6 +4,8 @@ Submit a fictional invoice or receipt, let a worker extract typed facts later, a
 
 Simulate this Google ADK AI agent with [Firedrill](https://firedrill.run/), a simulation platform for AI agents. Start with the [Firedrill setup and simulation guide](firedrill/README.md); your coding agent can operate it while this application's runner stays in your repository or CI.
 
+This example repository is publicly viewable. A project license has not been selected.
+
 ## Run one case
 
 Requires Python 3.12+ and `uv`. Listing, initialization, submission and journal inspection need no key.
@@ -93,7 +95,7 @@ uv run --locked python scripts/check_distribution.py
 
 The 67 offline checks include actual ADK/Gemini/native HTTP, loopback CLI completion/error/SIGTERM, raw usage and cleanup, expired/replaced attempts, uncertain commits, SQLite concurrency/recovery and dataset drift. Separate `BaseLlm` stub tests exercise framework state. Controlled responses verify boundaries, not Gemini judgment or a success rate. The legacy five text fixtures/version-1 manifest remain authoring/compatibility inputs. [Scenario briefs](scenarios/README.md) describe independent observations.
 
-Wheel and sdist gates install fresh locked dependencies outside checkout and exercise console/module CLI, eight private cases, key preflight, real busy-worker state changes, duplicate delivery, cancellation and expired-lease recovery. CI also regenerates exact case bytes. Live Gemini field quality/budget, authenticated Firedrill persistence verification, publication and license choice remain parked. Use the existing CLI/callable/journal/observation seams for a thin adapter only after the official release is qualified. Explore the [example catalog](https://github.com/firedrill-tools/firedrill-example-catalog), [Firedrill](https://firedrill.run/) and [official documentation](https://docs.firedrill.run/).
+Wheel and sdist gates install fresh locked dependencies outside checkout and exercise console/module CLI, eight private cases, key preflight, real busy-worker state changes, duplicate delivery, cancellation and expired-lease recovery. CI also regenerates exact case bytes. Live Gemini field quality/budget, authenticated Firedrill persistence verification, and license choice remain parked. Use the existing CLI/callable/journal/observation seams for a thin adapter only after the official release is qualified. Explore the [example catalog](https://github.com/firedrill-tools/firedrill-example-catalog), [Firedrill](https://firedrill.run/) and [official documentation](https://docs.firedrill.run/).
 
 ## Current Firedrill integration
 
